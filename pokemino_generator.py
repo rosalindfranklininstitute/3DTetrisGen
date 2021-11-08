@@ -13,8 +13,6 @@ import matplotlib.pyplot as plt
 import napari
 import mrcfile
 from pathlib import Path
-
-### Brick class
     
 STEPS_2D = np.array([[-1,0], [1,0], [0,1], [0,-1]])
 STEPS_3D = np.array([[-1,0,0], [1,0,0], [0,1,0], [0,-1,0], [0,0,1], [0,0,-1]])
