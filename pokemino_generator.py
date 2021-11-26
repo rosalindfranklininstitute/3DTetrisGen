@@ -13,8 +13,9 @@ import napari
 import mrcfile
 from pathlib import Path
 
-THETA_EACH_90 = [0, 90, 180, 270]
+from scipy.spatial.transform import Rotation as R
 
+THETA_EACH_90 = [0, 90, 180, 270]
 
 class Brick:
 
@@ -142,7 +143,9 @@ class Pokemino:
             for x in range(scale_factor):
                 for y in range(scale_factor):
                     for z in range(scale_factor):
-                        self.bricks[self.n_bricks] = Brick([x0+x, y0+y, z0+z], self.density)
+                        self.bricks[self.n_bricks] = Brick([x0*scale_factor+x,
+                                                            y0*scale_factor+y,
+                                                            z0*scale_factor+z], self.density)
                         self.n_bricks += 1
 
         self.size = new_n_bricks
@@ -161,7 +164,7 @@ class Pokemino:
 
 class Pokemino2D(Pokemino):
 
-    def __init__(self, seed, size, volume, dim=2, positioning="central", density=1, algorithm="clumped",
+    def __init__(self, seed, size, volume, dim=2, positioning="central", density=1, algorithm=False,
                  brick_pos_list=None):
         self.dim = dim
         super().__init__(seed, size, volume, dim, positioning, density, algorithm, brick_pos_list)
@@ -170,7 +173,8 @@ class Pokemino2D(Pokemino):
     def __repr__(self):
         return f'{self.__class__.__name__}({self.seed, self.size})'
 
-    def rotate_the_block(self, theta=None, randomise=True):
+    # TODO implement rotation using scipy.spatial.transform.Rotation
+    def rotate_the_pokemino(self, theta=None, randomise=True):
 
         if randomise:
             random.seed()
@@ -187,49 +191,39 @@ class Pokemino2D(Pokemino):
         for brick in self.bricks:
             brick.pos = np.rint(np.matmul(R, brick.pos)).astype(int)
 
-
 class Pokemino3D(Pokemino):
 
-    def __init__(self, seed, size, volume, dim=3, positioning="central", density=1, algorithm="clumped",
-                 brick_pos_list=None):
+    def __init__(self, seed, size, volume, dim=3, positioning="central", density=1, algorithm=False, brick_pos_list=None):
         self.dim = 3
         super().__init__(seed, size, volume, dim, positioning, density, algorithm, brick_pos_list)
 
     def __repr__(self):
         return f'{self.__class__.__name__}({self.seed, self.size})'
 
-    def rotate_the_block_1_axis(self, axis=None, theta=None, randomise=True):
+    def rotate_the_pokemino_1_axis(self, axis='z', theta=None):
 
-        assert (axis in range(0, 3)), 'Error: Pokemino3D.rotate_the_block requires to specify the axis as 0, 1, or 2.'
+        assert axis in ['x', 'y', 'z'], "Error: Pokemino3D.rotate_the_block requires to specify the axis as 'x', 'y', or 'z'."
 
-        if randomise:
+        if not theta:
             random.seed()
-            theta = random.choice(THETA_EACH_90) / 180 * np.pi
+            theta = random.choice(THETA_EACH_90)
         else:
-            assert (isinstance(theta, (
-                int, float))), 'Error: Pokemino3D.rotate_the_block requires the value for theta that is int or float.'
-            theta = theta / 180 * np.pi
+            assert (isinstance(theta, (int, float))), \
+                    'Error: Pokemino3D.rotate_the_block requires the value for theta that is int or float.'
 
-        c, s = np.cos(theta), np.sin(theta)
-
-        if axis == 0:
-            R = np.array(((1, 0, 0), (0, c, -s), (0, s, c)))
-        elif axis == 1:
-            R = np.array(((c, 0, s), (0, 1, 0), (-s, 0, c)))
-        elif axis == 2:
-            R = np.array(((c, -s, 0), (s, c, 0), (0, 0, 1)))
+        r = R.from_euler(axis, theta, degrees=True)
 
         for brick in self.bricks:
-            brick.pos = np.rint(np.matmul(R, brick.pos)).astype(int)
+            brick.pos = r.apply(brick.pos).astype(int)
 
         for i, pos in enumerate(self.excluded_pos):
-            self.excluded_pos[i] = np.rint(np.matmul(R, np.array(pos))).astype(int)
+            self.excluded_pos[i] = r.apply(brick.pos).astype(int)
 
-    def rotate_the_block_3_axes(self):
+    def rotate_the_pokemino_3_axes(self, theta_x=None, theta_y=None, theta_z=None):
 
-        self.rotate_the_block_1_axis(axis=0)
-        self.rotate_the_block_1_axis(axis=1)
-        self.rotate_the_block_1_axis(axis=2)
+        self.rotate_the_block_1_axis(axis='x', theta=theta_x)
+        self.rotate_the_block_1_axis(axis='y', theta=theta_y)
+        self.rotate_the_block_1_axis(axis='z', theta=theta_z)
 
 
 class Volume:
