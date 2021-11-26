@@ -13,8 +13,6 @@ import napari
 import mrcfile
 from pathlib import Path
 
-STEPS_2D = np.array([[-1, 0], [1, 0], [0, 1], [0, -1]])
-STEPS_3D = np.array([[-1, 0, 0], [1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]])
 THETA_EACH_90 = [0, 90, 180, 270]
 
 
@@ -27,53 +25,98 @@ class Brick:
     def __repr__(self):
         return f'{self.__class__.__name__}({self.pos})'
 
+
 class Pokemino:
 
-    def __init__(self, seed, size, volume, positioning='central', density=1, algorithm='clumped'):
+    def __init__(self, seed, size, volume, dim, positioning='central', density=1, algorithm=False, brick_pos_list=None):
 
-        random.seed(seed)
-
+        self.density = density
         self.size = size
         self.seed = seed
+        self.dim = dim
         self.bricks = np.empty(size, dtype=np.object)
-        self.bricks[0] = Brick([0] * self.dim, density)
-        i = 1
+        self.n_bricks = 0
+        self.density = 1
+        self.algorithm = algorithm
+
+        if not self.algorithm:
+            assert len(brick_pos_list) == self.size, "Size declared not matched with len(brick_pos_list)!"
+            assert all([isinstance(i, list) for i in brick_pos_list]), "Brick positions passed in an incorrect format!"
+            assert all([len(i) == self.dim for i in
+                        brick_pos_list]), "Brick coordinates don't match the declared dimensionality!"
+            brick_coords = brick_pos_list
+
+        elif self.algorithm == "clumped":
+            brick_coords = self.create_coords_for_clumped_pokemino()
+
+        elif self.algorithm == "extended":
+            brick_coords = self.create_coords_for_extended_pokemino()
+
+        for brick in brick_coords:
+            self.bricks[self.n_bricks] = Brick(brick, self.density)
+            self.n_bricks += 1
+
+        self.make_coords_relative_to_centre_of_mass()
+
         if positioning == 'central':
-            self.positioning = tuple(map(lambda x: int(round(x / 2)), volume.shape))
+            self.positioning = np.array(tuple(map(lambda x: int(round(x / 2)), volume.shape)))
         else:
-            self.positioning = list(positioning)
+            self.positioning = np.array(positioning)
+
+        # Find the Euclidean distance to the block furthest from the centre of mass
+        all_positions = np.array([brick.pos for brick in self.bricks])
+        self.max_radius = np.sqrt(np.max(np.sum(all_positions ** 2, axis=1)))
+
         self.excluded_pos = []
 
+        volume.creatures = np.hstack([volume.creatures, self])
+        volume.n_creatures += 1
+
+    def create_coords_for_clumped_pokemino(self):
+
+        random.seed(self.seed)
+
+        brick_coords = [[0] * self.dim]
         if self.dim == 2:
-            STEPS = STEPS_2D
+            steps = np.array([[-1, 0], [1, 0], [0, 1], [0, -1]])
         elif self.dim == 3:
-            STEPS = STEPS_3D
+            steps = np.array([[-1, 0, 0], [1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]])
 
-        if algorithm == 'clumped':
-            while np.count_nonzero(self.bricks) < self.size:
-                bricks_pos = [block.pos for block in self.bricks[self.bricks != None]]
-                random_step = random.choice(STEPS)
+        while len(brick_coords) < self.size:
+            random_step = random.choice(steps)
+            new_brick = list(random.choice(brick_coords) + random_step)
+            if new_brick not in brick_coords:
+                brick_coords.append(new_brick)
 
-                new_brick = list(random.choice(bricks_pos) + random_step)
+        return brick_coords
 
-                if new_brick not in bricks_pos:
-                    self.bricks[i] = Brick(new_brick, density)
-                    i += 1
+    def create_coords_for_extended_pokemino(self):
 
-        elif algorithm == 'extended':
-            while np.count_nonzero(self.bricks) < self.size:
-                bricks_pos = [block.pos for block in self.bricks[self.bricks != None]]
-                excluded_pos = []
-                for brick in bricks_pos:
-                    for step in STEPS:
-                        if tuple(np.array(brick) + np.array(step)) not in [bricks_pos, excluded_pos]:
-                                excluded_pos.append(tuple(np.array(brick) + np.array(step)))
-                next_brick = random.choice(excluded_pos)
-                self.bricks[i] = Brick(next_brick, density)
-                i += 1
+        random.seed(self.seed)
 
-        # Correct the coordinates to be relative to the centre of mass
-        weighted_coords = np.zeros((self.size, self.dim))
+        brick_coords = [[0] * self.dim]
+        if self.dim == 2:
+            steps = np.array([[-1, 0], [1, 0], [0, 1], [0, -1]])
+        elif self.dim == 3:
+            steps = np.array([[-1, 0, 0], [1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]])
+
+        # TODO make this faster
+        while len(brick_coords) < self.size:
+            potential_step_positions = []
+            for brick in brick_coords:
+                for step in steps:
+                    if tuple(np.array(brick) + np.array(step)) not in [brick_coords, potential_step_positions]:
+                        potential_step_positions.append(tuple(np.array(brick) + np.array(step)))
+            new_brick = random.choice(potential_step_positions)
+
+            if new_brick not in brick_coords:
+                brick_coords.append(new_brick)
+
+        return brick_coords
+
+    def make_coords_relative_to_centre_of_mass(self):
+
+        weighted_coords = np.zeros((self.n_bricks, self.dim))
         for i, brick in enumerate(self.bricks):
             weighted_coords[i] = [coord * brick.density for coord in brick.pos]
         com_pos = np.mean(weighted_coords, axis=0)
@@ -85,14 +128,8 @@ class Pokemino:
         for brick in self.bricks:
             brick_positions.append(brick.pos)
 
-        for brick in brick_positions:
-            for step in STEPS:
-                if list(np.array(brick) + np.array(step)) not in brick_positions:
-                    if tuple(np.array(brick) + np.array(step)) not in self.excluded_pos:
-                        self.excluded_pos.append(tuple(np.array(brick) + np.array(step)))
-
-        volume.creatures = np.hstack([volume.creatures, self])
-        volume.n_creatures += 1
+    def move_pokemino_in_volume(self, vector):
+        self.positioning = self.positioning + np.array(vector)
 
     def visualise_in_napari(self, display_window_size):
 
@@ -105,9 +142,10 @@ class Pokemino:
 
 class Pokemino2D(Pokemino):
 
-    def __init__(self, seed, size, volume, positioning="central", density=1, algorithm="clumped"):
-        self.dim = 2
-        super().__init__(seed, size, volume, positioning, density, algorithm)
+    def __init__(self, seed, size, volume, dim=2, positioning="central", density=1, algorithm="clumped",
+                 brick_pos_list=None):
+        self.dim = dim
+        super().__init__(seed, size, volume, dim, positioning, density, algorithm, brick_pos_list)
         random.seed()
 
     def __repr__(self):
@@ -133,9 +171,10 @@ class Pokemino2D(Pokemino):
 
 class Pokemino3D(Pokemino):
 
-    def __init__(self, seed, size, volume, positioning="central", density=1, algorithm="clumped"):
+    def __init__(self, seed, size, volume, dim=3, positioning="central", density=1, algorithm="clumped",
+                 brick_pos_list=None):
         self.dim = 3
-        super().__init__(seed, size, volume, positioning, density, algorithm)
+        super().__init__(seed, size, volume, dim, positioning, density, algorithm, brick_pos_list)
 
     def __repr__(self):
         return f'{self.__class__.__name__}({self.seed, self.size})'
@@ -196,22 +235,27 @@ class Volume:
             if all([(coord >= 0) and (coord < self.shape[i]) for i, coord in enumerate(placement_coords)]):
                 self.array[placement_coords] = 0.5  # called padding (adding a padding around)
 
-    def check_for_overlap(self, pokemino1, pokemino2):
-        occupied_coords_pokemino1 = []
-        for brick in pokemino1.bricks:
-            occupied_coords_pokemino1.append([x + y for (x, y) in zip(pokemino1.positioning, brick.pos)])
-        for excluded_pos in pokemino1.excluded_pos:
-            occupied_coords_pokemino1.append([x + y for (x, y) in zip(pokemino1.positioning, excluded_pos)])
+    def check_for_overlap (self, pokemino1, pokemino2):
 
-        occupied_coords_pokemino2 = []
-        for brick in pokemino2.bricks:
-            occupied_coords_pokemino2.append([x + y for (x, y) in zip(pokemino2.positioning, brick.pos)])
-        for excluded_pos in pokemino2.excluded_pos:
-            occupied_coords_pokemino2.append([x + y for (x, y) in zip(pokemino2.positioning, excluded_pos)])
+        distance_between_centres_of_mass = np.sum(np.square(pokemino1.positioning - pokemino2.positioning))
+        sum_of_max_radii = (np.sum(np.square(pokemino1.max_radius)) + np.sum(np.square(pokemino2.max_radius))).astype(
+            int)
 
-        for coords in occupied_coords_pokemino2:
-            if coords in occupied_coords_pokemino1:
-                return True
+        if sum_of_max_radii >= distance_between_centres_of_mass:
+
+            occupied_coords_pokemino1 = []
+            for brick in pokemino1.bricks:
+                occupied_coords_pokemino1.append([x + y for (x, y) in zip(pokemino1.positioning, brick.pos)])
+            for excluded_pos in pokemino1.excluded_pos:
+                occupied_coords_pokemino1.append([x + y for (x, y) in zip(pokemino1.positioning, excluded_pos)])
+
+            occupied_coords_pokemino2 = []
+            for brick in pokemino2.bricks:
+                occupied_coords_pokemino2.append([x + y for (x, y) in zip(pokemino2.positioning, brick.pos)])
+
+            for coords in occupied_coords_pokemino2:
+                if coords in occupied_coords_pokemino1:
+                    return True
 
     def check_for_pairwise_overlap(self):
         overlap = True
@@ -228,22 +272,28 @@ class Volume:
     def move_overlapping_apart(self, pokemino1, pokemino2):
         lottery_machine = []
 
-        # print ("Before moving apart:", np.array(pokemino1.positioning), np.array(pokemino2.positioning))
+        print("Before moving apart:", pokemino1.positioning, np.array(pokemino2.positioning))
 
-        for i, coord in enumerate(np.array(pokemino1.positioning) - np.array(pokemino2.positioning)):
+        for i, coord in enumerate(pokemino1.positioning - pokemino2.positioning):
             empty = np.array([0] * pokemino1.dim)
             if coord != 0:
                 empty[i] = coord / abs(coord)
             lottery_machine.extend([empty] * abs(coord))
 
+        if all(pokemino1.positioning == pokemino2.positioning):
+            lottery_machine = [[0] * pokemino1.dim]
+            lottery_machine[0][0] = 1
+
         random.shuffle(lottery_machine)
 
         i = 0
         while self.check_for_overlap(pokemino1, pokemino2):
-            pokemino1.positioning = tuple(np.array(pokemino1.positioning) + lottery_machine[i % len(lottery_machine)])
+            pokemino_to_move = random.choice([pokemino1, pokemino2])
+            vector = lottery_machine[i % len(lottery_machine)]
+            pokemino_to_move.move_pokemino_in_volume(vector)
             i += 1
 
-        # print ("After moving apart:", np.array(pokemino1.positioning), np.array(pokemino2.positioning))
+        print("After moving apart:", pokemino1.positioning, pokemino2.positioning)
 
     def fit_all_pokeminos(self, fit_excluded_volume=False):
         if fit_excluded_volume:
@@ -269,9 +319,11 @@ class Volume:
     def create_subpixel_resolution_array(self, subpixels):
 
         if self.new_image is None:
-            self.subpixel_resolution_array = self.array.repeat(subpixels, axis=0).repeat(subpixels, axis=1).repeat(subpixels, axis=2).astype(np.int8)
+            self.subpixel_resolution_array = self.array.repeat(subpixels, axis=0).repeat(subpixels, axis=1).repeat(
+                subpixels, axis=2).astype(np.int8)
         else:
-            self.subpixel_resolution_array = self.new_image.repeat(subpixels, axis=0).repeat(subpixels, axis=1).repeat(subpixels, axis=2).astype(np.int8)
+            self.subpixel_resolution_array = self.new_image.repeat(subpixels, axis=0).repeat(subpixels, axis=1).repeat(
+                subpixels, axis=2).astype(np.int8)
 
     def save_as_mrcfile(self, output_path: Path):
         mrc = mrcfile.new(output_path, overwrite=True)
