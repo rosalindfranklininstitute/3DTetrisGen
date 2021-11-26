@@ -128,6 +128,25 @@ class Pokemino:
         for brick in self.bricks:
             brick_positions.append(brick.pos)
 
+    def upscale_pokemino (self, scale_factor):
+
+        self.n_bricks=0
+        brick_positions = []
+        for brick in self.bricks:
+            brick_positions.append(brick.pos)
+
+        new_n_bricks = self.size * scale_factor ** self.dim
+        self.bricks = np.empty(new_n_bricks, dtype=np.object)
+
+        for (x0, y0, z0) in brick_positions:
+            for x in range(scale_factor):
+                for y in range(scale_factor):
+                    for z in range(scale_factor):
+                        self.bricks[self.n_bricks] = Brick([x0+x, y0+y, z0+z], self.density)
+                        self.n_bricks += 1
+
+        self.size = new_n_bricks
+
     def move_pokemino_in_volume(self, vector):
         self.positioning = self.positioning + np.array(vector)
 
