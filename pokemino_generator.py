@@ -13,7 +13,7 @@ import napari
 import mrcfile
 from pathlib import Path
 
-from scipy.spatial.transform import Rotation as R
+from scipy import ndimage
 
 THETA_EACH_90 = [0, 90, 180, 270]
 
@@ -29,7 +29,7 @@ class Brick:
 
 class Pokemino:
 
-    def __init__(self, seed, size, volume, dim, positioning='central', density=1, algorithm=False, brick_pos_list=None):
+    def __init__(self, seed, size, volume, dim, positioning='central', density = 1, algorithm=False, brick_pos_list=None):
 
         self.density = density
         self.size = size
@@ -37,7 +37,7 @@ class Pokemino:
         self.dim = dim
         self.bricks = np.empty(size, dtype=np.object)
         self.n_bricks = 0
-        self.density = 1
+        # self.density = 1
         self.algorithm = algorithm
 
         if not self.algorithm:
@@ -64,9 +64,14 @@ class Pokemino:
         else:
             self.positioning = np.array(positioning)
 
-        # Find the Euclidean distance to the block furthest from the centre of mass
-        all_positions = np.array([brick.pos for brick in self.bricks])
-        self.max_radius = np.sqrt(np.max(np.sum(all_positions ** 2, axis=1)))
+        self.find_max_radius()
+
+        r = int(self.max_radius)
+        self.poke_array = np.zeros((2 * r + 1,) * self.dim)
+
+        for brick in self.bricks:
+            placement_coords = tuple(x + y for (x, y) in zip((r,) * self.dim, brick.pos))
+            self.poke_array[placement_coords] = brick.density
 
         self.excluded_pos = []
 
@@ -91,6 +96,7 @@ class Pokemino:
 
         return brick_coords
 
+    # TODO this is outdated since self.poke_array was introduced
     def create_coords_for_extended_pokemino(self):
 
         random.seed(self.seed)
@@ -125,30 +131,20 @@ class Pokemino:
         for i, brick in enumerate(self.bricks):
             brick.pos = [i - j for (i, j) in zip(brick.pos, new_com)]
 
-        brick_positions = []
-        for brick in self.bricks:
-            brick_positions.append(brick.pos)
+    def find_max_radius(self):
+        """Finds the Euclidean distance to the block furthest from the centre of mass"""
+        all_positions = np.array([brick.pos for brick in self.bricks])
+        self.max_radius = np.sqrt(np.max(np.sum(all_positions ** 2, axis=1)))
 
     def upscale_pokemino (self, scale_factor):
 
-        self.n_bricks=0
-        brick_positions = []
-        for brick in self.bricks:
-            brick_positions.append(brick.pos)
+        if self.dim == 3:
+            self.poke_array = self.poke_array.repeat(scale_factor, axis=0).repeat(scale_factor, axis=1).repeat(
+            scale_factor, axis=2).astype(np.float32)
+        elif self.dim == 2:
+            self.poke_array = self.poke_array.repeat(scale_factor, axis=0).repeat(scale_factor, axis=1).astype(np.float32)
 
-        new_n_bricks = self.size * scale_factor ** self.dim
-        self.bricks = np.empty(new_n_bricks, dtype=np.object)
-
-        for (x0, y0, z0) in brick_positions:
-            for x in range(scale_factor):
-                for y in range(scale_factor):
-                    for z in range(scale_factor):
-                        self.bricks[self.n_bricks] = Brick([x0*scale_factor+x,
-                                                            y0*scale_factor+y,
-                                                            z0*scale_factor+z], self.density)
-                        self.n_bricks += 1
-
-        self.size = new_n_bricks
+        self.max_radius *= scale_factor
 
     def move_pokemino_in_volume(self, vector):
         self.positioning = self.positioning + np.array(vector)
@@ -173,7 +169,7 @@ class Pokemino2D(Pokemino):
     def __repr__(self):
         return f'{self.__class__.__name__}({self.seed, self.size})'
 
-    # TODO implement rotation using scipy.spatial.transform.Rotation
+    # TODO implement rotation using scipy.ndimage.rotate
     def rotate_the_pokemino(self, theta=None, randomise=True):
 
         if randomise:
@@ -200,47 +196,52 @@ class Pokemino3D(Pokemino):
     def __repr__(self):
         return f'{self.__class__.__name__}({self.seed, self.size})'
 
-    def rotate_the_pokemino_1_axis(self, axis='z', theta=None):
+    def rotate_the_pokemino_1_axis(self, axes=(0,1), theta=None, order=1):
+        """Rotates the Pokemino using scipy.ndimage.rotate"""
 
-        assert axis in ['x', 'y', 'z'], "Error: Pokemino3D.rotate_the_block requires to specify the axis as 'x', 'y', or 'z'."
+        assert type(axes) == tuple \
+               and len(axes) == 2 \
+               and all([type(i) == int for i in axes]) \
+               and all([i in range(0, 3) for i in axes]), \
+                "Incorrect axes parameter: pass a tuple of 2 axes."
 
         if not theta:
             random.seed()
-            theta = random.choice(THETA_EACH_90)
+            theta = random.choice([i for i in range(0, 360)])
         else:
-            assert (isinstance(theta, (int, float))), \
-                    'Error: Pokemino3D.rotate_the_block requires the value for theta that is int or float.'
-
-        r = R.from_euler(axis, theta, degrees=True)
-
-        for brick in self.bricks:
-            brick.pos = r.apply(brick.pos).astype(int)
-
-        for i, pos in enumerate(self.excluded_pos):
-            self.excluded_pos[i] = r.apply(brick.pos).astype(int)
+            assert (isinstance(theta, int)) and theta in range(0, 360), \
+                    'Error: Pokemino3D.rotate_the_block requires the value for theta in range <0, 360>.'
+        self.poke_array = ndimage.rotate(self.poke_array, angle=theta, axes=axes, order=1, reshape=True)
+        # viewer = napari.view_image(self.poke_array)
 
     def rotate_the_pokemino_3_axes(self, theta_x=None, theta_y=None, theta_z=None):
 
-        self.rotate_the_block_1_axis(axis='x', theta=theta_x)
-        self.rotate_the_block_1_axis(axis='y', theta=theta_y)
-        self.rotate_the_block_1_axis(axis='z', theta=theta_z)
+        self.rotate_the_pokemino_1_axis(axes=(1,0), theta=theta_x)
+        self.rotate_the_pokemino_1_axis(axes=(2,1), theta=theta_y)
+        self.rotate_the_pokemino_1_axis(axes=(0,2), theta=theta_z)
 
 
 class Volume:
 
     def __init__(self, shape):
         self.shape = shape
-        self.array = np.zeros(shape, dtype=np.int8)
+        self.array = np.zeros(shape, dtype=np.float32)
         self.n_creatures = 0
         self.creatures = np.empty(0, dtype=np.object)
         self.subpixel_resolution_array = None
         self.new_image = None
 
     def fit_pokemino(self, pokemino):
-        for brick in pokemino.bricks:
-            placement_coords = tuple(x + y for (x, y) in zip(pokemino.positioning, brick.pos))
-            if all([(coord >= 0) and (coord < self.shape[i]) for i, coord in enumerate(placement_coords)]):
-                self.array[placement_coords] = brick.density
+        middle_x, middle_y, middle_z = int((pokemino.poke_array.shape[0] - 1) / 2), int((pokemino.poke_array.shape[1] - 1) / 2), int((pokemino.poke_array.shape[2] - 1) / 2)
+        for i in range(-middle_x, middle_x + 1):
+            for j in range(-middle_y, middle_y + 1):
+                for k in range(-middle_z, middle_z + 1):
+                    if pokemino.positioning[0] + i >= 0 and pokemino.positioning[1] + j >= 0 and pokemino.positioning[
+                        2] + k >= 0:
+                        try:
+                            self.array[pokemino.positioning[0] + i, pokemino.positioning[1] + j, pokemino.positioning[2] + k] += pokemino.poke_array[middle_x + i, middle_y + j, middle_z + k]
+                        except IndexError:
+                            pass
 
     def fit_excluded_volume(self, pokemino):
         for excluded_voxel in pokemino.excluded_pos:
@@ -250,25 +251,11 @@ class Volume:
 
     def check_for_overlap (self, pokemino1, pokemino2):
 
-        distance_between_centres_of_mass = np.sum(np.square(pokemino1.positioning - pokemino2.positioning))
-        sum_of_max_radii = (np.sum(np.square(pokemino1.max_radius)) + np.sum(np.square(pokemino2.max_radius))).astype(
-            int)
+        distance_between_centres_of_mass = np.sqrt(np.sum(np.square(pokemino1.positioning - pokemino2.positioning)))
+        sum_of_max_radii = (np.sqrt(np.sum(np.square(pokemino1.max_radius))) + np.sqrt(np.sum(np.square(pokemino2.max_radius))))
 
-        if sum_of_max_radii >= distance_between_centres_of_mass:
-
-            occupied_coords_pokemino1 = []
-            for brick in pokemino1.bricks:
-                occupied_coords_pokemino1.append([x + y for (x, y) in zip(pokemino1.positioning, brick.pos)])
-            for excluded_pos in pokemino1.excluded_pos:
-                occupied_coords_pokemino1.append([x + y for (x, y) in zip(pokemino1.positioning, excluded_pos)])
-
-            occupied_coords_pokemino2 = []
-            for brick in pokemino2.bricks:
-                occupied_coords_pokemino2.append([x + y for (x, y) in zip(pokemino2.positioning, brick.pos)])
-
-            for coords in occupied_coords_pokemino2:
-                if coords in occupied_coords_pokemino1:
-                    return True
+        if sum_of_max_radii >= distance_between_centres_of_mass + 1:
+            return True
 
     def check_for_pairwise_overlap(self):
         overlap = True
@@ -285,7 +272,7 @@ class Volume:
     def move_overlapping_apart(self, pokemino1, pokemino2):
         lottery_machine = []
 
-        print("Before moving apart:", pokemino1.positioning, np.array(pokemino2.positioning))
+        # print("Before moving apart:", pokemino1.positioning, np.array(pokemino2.positioning))
 
         for i, coord in enumerate(pokemino1.positioning - pokemino2.positioning):
             empty = np.array([0] * pokemino1.dim)
@@ -303,10 +290,13 @@ class Volume:
         while self.check_for_overlap(pokemino1, pokemino2):
             pokemino_to_move = random.choice([pokemino1, pokemino2])
             vector = lottery_machine[i % len(lottery_machine)]
-            pokemino_to_move.move_pokemino_in_volume(vector)
+            if pokemino_to_move is pokemino1:
+                pokemino_to_move.move_pokemino_in_volume(vector)
+            elif pokemino_to_move is pokemino2:
+                pokemino_to_move.move_pokemino_in_volume(-vector)
             i += 1
 
-        print("After moving apart:", pokemino1.positioning, pokemino2.positioning)
+        # print("After moving apart:", pokemino1.positioning, pokemino2.positioning)
 
     def fit_all_pokeminos(self, fit_excluded_volume=False):
         if fit_excluded_volume:
@@ -316,6 +306,7 @@ class Volume:
         for pokemino in self.creatures:
             self.fit_pokemino(pokemino)
 
+    # TODO: build something that does it but is compatible with poke_array
     def add_extra_volume_to_remove_cuts(self):
         all_positions = np.array([0, 0, 0])
         for creature in self.creatures:
@@ -333,10 +324,10 @@ class Volume:
 
         if self.new_image is None:
             self.subpixel_resolution_array = self.array.repeat(subpixels, axis=0).repeat(subpixels, axis=1).repeat(
-                subpixels, axis=2).astype(np.int8)
+                subpixels, axis=2).astype(np.float32)
         else:
             self.subpixel_resolution_array = self.new_image.repeat(subpixels, axis=0).repeat(subpixels, axis=1).repeat(
-                subpixels, axis=2).astype(np.int8)
+                subpixels, axis=2).astype(np.float32)
 
     def save_as_mrcfile(self, output_path: Path):
         mrc = mrcfile.new(output_path, overwrite=True)
