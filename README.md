@@ -1,9 +1,9 @@
-# 3DTetrisGen
+# Pokéminos
 <img align="right" height="260" src="https://drive.google.com/uc?export=view&id=1Bl-VZjKLBglyStexHXucXALCdp5BxAhi">
 
-In this project a toy model is created for testing classification capabilities of β-VAEs.
+In this project a toy model for testing classification capabilities of β-VAEs is created.
 
-Pokéminos (called lattice animals otherwise) are created from random seeds, randomly rotated and then fitted into 
-3D volumes avoiding overlap between blocks. Many replicas of the same object in other same volume.
+Pokéminos (otherwise called lattice animals) are created from Pokémon-derived string seeds, randomly rotated and then fitted into 
+3D volumes with no overlap between creatures. Many replicas of the same Pokémino in the same volume are supported.
 
 Output images are saved as mrcfiles.
