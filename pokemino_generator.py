@@ -178,7 +178,7 @@ class Pokemino2D(Pokemino):
         else:
             assert (isinstance(theta, int)) and theta in range(0, 360), \
                 'Error: Pokemino3D.rotate_the_block requires the value for theta in range <0, 360>.'
-        self.poke_array = ndimage.rotate(self.poke_array, angle=theta, order=order, reshape=True)
+        self.poke_array = ndimage.rotate(self.poke_array, angle=theta, order=order, reshape=False)
 
 
 class Pokemino3D(Pokemino):
@@ -206,8 +206,8 @@ class Pokemino3D(Pokemino):
         else:
             assert (isinstance(theta, int)) and theta in range(0, 360), \
                 'Error: Pokemino3D.rotate_the_block requires the value for theta in range <0, 360>.'
-        self.poke_array = ndimage.rotate(self.poke_array, angle=theta, axes=axes, order=order, reshape=True)
-        print(theta)
+        self.poke_array = ndimage.rotate(self.poke_array, angle=theta, axes=axes, order=order, reshape=False)
+
         # viewer = napari.view_image(self.poke_array)
 
 
@@ -231,8 +231,11 @@ class Volume:
     def fit_pokemino(self, pokemino):
 
         """Fir pokemino.poke_array into volume (centred at pokemino.positioning)"""
-        slices = [np.s_[i - r: i + r + 1] for i, r in zip(pokemino.positioning, [pokemino.r, ] * pokemino.dim)]
+        slices = [np.s_[i - a: i + b] for i, a, b in zip(pokemino.positioning,
+                                                         np.floor(np.array(pokemino.poke_array.shape) / 2).astype(np.int32),
+                                                         pokemino.poke_array.shape - np.floor(np.array(pokemino.poke_array.shape) / 2).astype(np.int32))]
         self.array[slices] += pokemino.poke_array
+        self.i += 1
 
 
     def check_for_overlap(self, pokemino1, pokemino2):
@@ -303,14 +306,15 @@ class Volume:
         top_left_corners = np.zeros((self.n_creatures, self.dim))
         bottom_right_corners = np.zeros((self.n_creatures, self.dim))
         for i, poke in enumerate(self.creatures):
-            top_left_corners[i] = poke.positioning - np.array([poke.r, ] * poke.dim)
-            bottom_right_corners[i] = poke.positioning + np.array([poke.r, ] * poke.dim)
+            top_left_corners[i] = poke.positioning - np.floor(np.array(poke.poke_array.shape) / 2).astype(np.int32)
+            bottom_right_corners[i] = poke.positioning + poke.poke_array.shape - np.floor(np.array(poke.poke_array.shape) / 2).astype(np.int32) - 1
 
         """Find the lowest and highest coordinates occupied by any of poke_arrays in volume. """
         tl, br = np.min(top_left_corners, axis=0), np.max(bottom_right_corners, axis=0)
 
         """Extend volume.array in all dimensions in which Pokeminos stick out."""
         negative_extensions = np.where(tl < 0, -tl, 0).astype(np.int32)
+        print ("tl, br:", tl, br)
         positive_extensions = np.where(br > np.array(self.shape) - 1, br - (np.array(self.shape) - 1), 0).astype(
             np.int16)
         self.array = np.zeros(positive_extensions + negative_extensions + np.array(self.shape))
@@ -320,6 +324,7 @@ class Volume:
             poke.positioning += negative_extensions
 
         """Only now fit all Pokeminos."""
+        self.i = 0
         for pokemino in self.creatures:
             self.fit_pokemino(pokemino)
 
