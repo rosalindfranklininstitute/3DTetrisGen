@@ -42,7 +42,6 @@ class Pokemino:
             assert all([isinstance(i, list) for i in brick_coords]), "Brick positions passed in an incorrect format!"
             assert all([len(i) == self.dim for i in
                         brick_coords]), "Brick coordinates don't match the declared dimensionality!"
-            self.brick_coords = brick_coords
 
         elif self.algorithm == "clumped":
             brick_coords = self.create_coords_for_clumped_pokemino()
@@ -54,20 +53,18 @@ class Pokemino:
             self.bricks[i] = Brick(brick, self.density)
 
         self.make_coords_relative_to_centre_of_mass()
-        self.brick_coords = [brick.pos for brick in self.bricks]
 
-        self.max_radius = Pokemino.find_max_radius(self.brick_coords)
+        self.max_radius = Pokemino.find_max_radius([brick.pos for brick in self.bricks])
 
         if positioning == 'central':
             self.positioning = np.array(tuple(map(lambda x: int(round(x / 2)), volume.shape)))
         else:
             self.positioning = np.array(positioning)
 
-        self.r = int(self.max_radius)
-        self.poke_array = np.zeros((2 * self.r + 1,) * self.dim)
+        self.poke_array = np.zeros((2 * int(self.max_radius) + 1,) * self.dim)
 
         for brick in self.bricks:
-            placement_coords = tuple(x + y for (x, y) in zip((self.r,) * self.dim, brick.pos))
+            placement_coords = tuple(x + y for (x, y) in zip((int(self.max_radius),) * self.dim, brick.pos))
             self.poke_array[placement_coords] = brick.density
 
         volume.creatures = np.hstack([volume.creatures, self])
@@ -123,7 +120,6 @@ class Pokemino:
         new_com = self.bricks[np.argmin(np.sum(np.square(weighted_coords - com_pos), axis=1))].pos
         for i, brick in enumerate(self.bricks):
             brick.pos = [i - j for (i, j) in zip(brick.pos, new_com)]
-        self.brick_coords = [brick.pos for brick in self.bricks]
 
 
     @staticmethod
@@ -155,7 +151,7 @@ class Pokemino:
         central_pos = tuple(map(lambda x: round(x / 2), display_window.shape))
         for brick in self.bricks:
             display_window[tuple(x + y for (x, y) in zip(central_pos, brick.pos))] = 1
-        napari.view_image(display_window)
+        napari.view_image(display_window_size)
 
 
 class Pokemino2D(Pokemino):
@@ -235,7 +231,6 @@ class Volume:
                                                          np.floor(np.array(pokemino.poke_array.shape) / 2).astype(np.int32),
                                                          pokemino.poke_array.shape - np.floor(np.array(pokemino.poke_array.shape) / 2).astype(np.int32))]
         self.array[slices] += pokemino.poke_array
-        self.i += 1
 
 
     def check_for_overlap(self, pokemino1, pokemino2):
@@ -324,7 +319,6 @@ class Volume:
             poke.positioning += negative_extensions
 
         """Only now fit all Pokeminos."""
-        self.i = 0
         for pokemino in self.creatures:
             self.fit_pokemino(pokemino)
 
