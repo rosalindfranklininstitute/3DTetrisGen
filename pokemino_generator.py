@@ -85,8 +85,25 @@ class Pokemino:
 
         self.max_ratio = 50 if max_ratio is None else max_ratio
 
-        self.bricks = list()
-        self.neighbours = list([Brick((0, 0, 0))])
+        self.bricks = list([Brick((0, 0, 0)),
+                            Brick((1, 0, 0)),
+                            Brick((0, 1, 0)),
+                            Brick((0, 0, 1))])
+        self.neighbours = list([Brick((1, 0, 1)),
+                                Brick((0, 1, 1)),
+                                Brick((0, 0, 2)),
+                                Brick((0, 0, -1)),
+                                Brick((0, 0, -1)),
+                                Brick((0, 0, -1)),
+                                Brick((-1, 0, 0)),
+                                Brick((-1, 1, 0)),
+                                Brick((-1, 0, 1)),
+                                Brick((0, -1, 0)),
+                                Brick((1, -1, 0)),
+                                Brick((0, -1, 1)),
+                                Brick((2, 0, 0)),
+                                Brick((0, 2, 0)),
+                                Brick((1, 1, 0))])
 
         if self.algorithm == "biased":
             for brick in tqdm(range(self.size)):
@@ -161,10 +178,9 @@ class Pokemino:
         # Update neighbour brick objects
         self.neighbours = [Brick(x, stick_prob=self.cf) for x in neighbours_coords]
 
-        # Update neighbour Brick object sticking probability (if cluster population >= 25)
-        if len(self.bricks) >= 5:
-            for brick in self.neighbours:
-                brick.stick_prob += self._calc_prob_change(brick_coords, brick.pos, self.target_ratio)
+        # Update neighbour Brick object sticking probability
+        for brick in self.neighbours:
+            brick.stick_prob += self._calc_prob_change(brick_coords, brick.pos, self.target_ratio)
 
     def _calc_prob_change(self, curr_brick_coords, extra_brick, target_ratio):
         """
