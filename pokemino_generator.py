@@ -67,45 +67,46 @@ class Pokemino:
         self.density = density
         self.algorithm = algorithm
 
-        if target_ratio is None:
-            self.target_ratio = np.array([1., 1., 1.], dtype=float)
-        self.target_ratio = np.array([target_ratio[1] / target_ratio[0],
-                                      target_ratio[2] / target_ratio[1],
-                                      target_ratio[2] / target_ratio[0],
-                                      target_ratio[0] / target_ratio[1],
-                                      target_ratio[1] / target_ratio[2],
-                                      target_ratio[0] / target_ratio[2]
-                                      ])
-
-        # Set seeds for random and numpy modules
-        self.seed = 'pikachu' if seed is None else seed
-        self._np_seed = np.dot(np.array([ord(x) for x in self.seed]), np.arange(len(self.seed)))
-        random.seed(self.seed)
-        self._np_rng = np.random.default_rng(self._np_seed)
-
-        self.max_ratio = 50 if max_ratio is None else max_ratio
-
-        self.bricks = list([Brick((0, 0, 0)),
-                            Brick((1, 0, 0)),
-                            Brick((0, 1, 0)),
-                            Brick((0, 0, 1))])
-        self.neighbours = list([Brick((1, 0, 1)),
-                                Brick((0, 1, 1)),
-                                Brick((0, 0, 2)),
-                                Brick((0, 0, -1)),
-                                Brick((0, 0, -1)),
-                                Brick((0, 0, -1)),
-                                Brick((-1, 0, 0)),
-                                Brick((-1, 1, 0)),
-                                Brick((-1, 0, 1)),
-                                Brick((0, -1, 0)),
-                                Brick((1, -1, 0)),
-                                Brick((0, -1, 1)),
-                                Brick((2, 0, 0)),
-                                Brick((0, 2, 0)),
-                                Brick((1, 1, 0))])
-
         if self.algorithm == "biased":
+
+            # Set seeds for random and numpy modules
+            self.seed = 'pikachu' if seed is None else seed
+            self._np_seed = np.dot(np.array([ord(x) for x in self.seed]), np.arange(len(self.seed)))
+            random.seed(self.seed)
+            self._np_rng = np.random.default_rng(self._np_seed)
+
+            self.max_ratio = 50 if max_ratio is None else max_ratio
+
+            self.bricks = list([Brick((0, 0, 0)),
+                                Brick((1, 0, 0)),
+                                Brick((0, 1, 0)),
+                                Brick((0, 0, 1))])
+            self.neighbours = list([Brick((1, 0, 1)),
+                                    Brick((0, 1, 1)),
+                                    Brick((0, 0, 2)),
+                                    Brick((0, 0, -1)),
+                                    Brick((0, 0, -1)),
+                                    Brick((0, 0, -1)),
+                                    Brick((-1, 0, 0)),
+                                    Brick((-1, 1, 0)),
+                                    Brick((-1, 0, 1)),
+                                    Brick((0, -1, 0)),
+                                    Brick((1, -1, 0)),
+                                    Brick((0, -1, 1)),
+                                    Brick((2, 0, 0)),
+                                    Brick((0, 2, 0)),
+                                    Brick((1, 1, 0))])
+
+            if target_ratio is None:
+                self.target_ratio = np.array([1., 1., 1.], dtype=float)
+            self.target_ratio = np.array([self.target_ratio[1] / self.target_ratio[0],  # y/x
+                                          self.target_ratio[2] / self.target_ratio[1],  # z/y
+                                          self.target_ratio[2] / self.target_ratio[0],  # z/x
+                                          self.target_ratio[0] / self.target_ratio[1],  # x/y
+                                          self.target_ratio[1] / self.target_ratio[2],  # y/z
+                                          self.target_ratio[0] / self.target_ratio[2],  # x/z
+                                          ])
+
             for brick in tqdm(range(self.size)):
                 # Pick a brick then generate a random number
                 new_brick = random.choice(self.neighbours)
@@ -120,6 +121,7 @@ class Pokemino:
             assert all([isinstance(i, list) for i in brick_coords]), "Brick positions passed in an incorrect format!"
             assert all([len(i) == self.dim for i in
                         brick_coords]), "Brick coordinates don't match the declared dimensionality!"
+            self.bricks = list()
             for i, brick_pos in enumerate(brick_coords):
                 self.bricks.append(Brick(brick_pos))
 
@@ -128,11 +130,11 @@ class Pokemino:
         self.max_radius = self.find_max_radius([brick.pos for brick in self.bricks])
 
         self.ratio = self._calc_ratios([x.pos for x in self.bricks], final=True)
-        self.colour = self._calc_colour()
-        self.fractal_dim = self._calc_fractal_dim([x.pos for x in self.bricks])
+        #self.colour = self._calc_colour()
+        #self.fractal_dim = self._calc_fractal_dim([x.pos for x in self.bricks])
 
-        ic(self.ratio, self.colour)
-        ic(self.fractal_dim)
+        #ic(self.ratio, self.colour)
+        #ic(self.fractal_dim)
 
         if positioning == 'central':
             self.positioning = np.array(tuple(map(lambda x: int(round(x / 2)), volume.shape)))
