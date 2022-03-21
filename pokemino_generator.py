@@ -398,13 +398,24 @@ class Volume:
 
     def fit_pokemino(self, pokemino):
 
-        """Fir pokemino.poke_array into volume (centred at pokemino.positioning)"""
-        slices = [np.s_[i - a: i + b] for i, a, b in zip(pokemino.positioning,
-                                                         np.floor(np.array(pokemino.poke_array.shape) / 2).astype(
-                                                             np.int32),
-                                                         pokemino.poke_array.shape - np.floor(
-                                                             np.array(pokemino.poke_array.shape) / 2).astype(np.int32))]
-        self.array[slices] += pokemino.poke_array
+        """Fit pokemino.poke_array into volume (centred at pokemino.positioning)"""
+        slices_boundaries = np.array([[i - a, i + b] for i, a, b in zip(pokemino.positioning,
+                                                                        np.floor(np.array(pokemino.poke_array.shape) / 2).astype(np.int32),
+                                                                        pokemino.poke_array.shape - np.floor(np.array(pokemino.poke_array.shape) / 2).astype(np.int32))])
+
+        extensions = np.array([(min(0, i), max(0, j-(self.shape[0]-1))) for i, j in slices_boundaries])
+
+        array_boundaries = np.array([[0, pokemino.poke_array.shape[i]] for i in range(3)])
+        array_boundaries[:,1] -= 1
+        slices_boundaries[:, 1] -= 1
+
+        pst = [(i, j) for [i, j] in array_boundaries-extensions]
+        to_pst = [(i, j) for [i, j] in slices_boundaries-extensions]
+
+        #print(extensions)
+        #print(pst, to_pst)
+
+        self.array[to_pst[0][0]:to_pst[0][1], to_pst[1][0]:to_pst[1][1], to_pst[2][0]:to_pst[2][1]] += pokemino.poke_array[pst[0][0]:pst[0][1], pst[1][0]:pst[1][1], pst[2][0]:pst[2][1]]
 
     @staticmethod
     def check_for_overlap(pokemino1, pokemino2):
