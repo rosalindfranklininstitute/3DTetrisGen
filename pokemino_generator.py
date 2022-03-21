@@ -11,11 +11,11 @@ import numpy as np
 from pathlib import Path
 from icecream import ic
 from scipy import ndimage
+from itertools import product
 
 import napari
 import mrcfile
 from tqdm import tqdm
-
 
 class Brick:
 
@@ -40,6 +40,7 @@ class Pokemino:
                  positioning,
                  algorithm,
                  brick_coords,
+                 scale_factor,
                  density,
                  max_ratio):
 
@@ -56,6 +57,7 @@ class Pokemino:
         positioning (list)   :: Set of coordinates at which the Pokemino will be placed or "central" for fitting at volume centre
         algorithm            :: 'biased' when using Neville's biased generator or False when providing brick_coords
         brick_coords (list)  :: list of brick coordinates if not using biased algorithm
+        scale_factor (int)   :: a scale factor for upscaling user-defined pokemino coords
         density (int)        :: at the moment always == 1
         max_ratio (int)      ::
         """
@@ -66,6 +68,7 @@ class Pokemino:
         self.cf = crowd_factor ** 2.5
         self.density = density
         self.algorithm = algorithm
+        self.scale_factor = scale_factor
 
         if self.algorithm == "biased":
 
@@ -122,8 +125,10 @@ class Pokemino:
             assert all([len(i) == self.dim for i in
                         brick_coords]), "Brick coordinates don't match the declared dimensionality!"
             self.bricks = list()
-            for i, brick_pos in enumerate(brick_coords):
-                self.bricks.append(Brick(brick_pos))
+            for brick_pos in brick_coords:
+                upscaled_coords = list(product(*[[coord * scale_factor + i for i in range(scale_factor)] for coord in brick_pos]))
+                for i in upscaled_coords:
+                    self.bricks.append(Brick(i))
 
         self.make_coords_relative_to_centre_of_mass()
 
@@ -143,6 +148,7 @@ class Pokemino:
 
         self.poke_array = np.zeros((2 * int(self.max_radius) + 1,) * self.dim)
 
+        # TODO: deal with reading scaling_factor and upscaling a biased pokemino
         for brick in self.bricks:
             placement_coords = tuple(x + y for (x, y) in zip((int(self.max_radius),) * self.dim, brick.pos))
             self.poke_array[placement_coords] = brick.density
@@ -322,9 +328,9 @@ class Pokemino:
 class Pokemino2D(Pokemino):
 
     def __init__(self, size, volume, dim=2, seed=None, crowd_factor=0.5, target_ratio=None, positioning='central',
-                 algorithm="biased", brick_coords=None, density=1, max_ratio=None):
+                 algorithm="biased", brick_coords=None, scale_factor=1, density=1, max_ratio=None):
         super().__init__(size, volume, dim, seed, crowd_factor, target_ratio, positioning, algorithm, brick_coords,
-                         density, max_ratio)
+                         scale_factor, density, max_ratio)
         random.seed()
 
     def __repr__(self):
@@ -345,9 +351,9 @@ class Pokemino2D(Pokemino):
 class Pokemino3D(Pokemino):
 
     def __init__(self, size, volume, dim=3, seed=None, crowd_factor=0.5, target_ratio=None, positioning='central',
-                 algorithm="biased", brick_coords=None, density=1, max_ratio=None):
+                 algorithm="biased", brick_coords=None, scale_factor=1, density=1, max_ratio=None):
         super().__init__(size, volume, dim, seed, crowd_factor, target_ratio, positioning, algorithm, brick_coords,
-                         density, max_ratio)
+                         scale_factor, density, max_ratio)
         random.seed()
 
     def __repr__(self):
