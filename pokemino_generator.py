@@ -416,7 +416,10 @@ class Volume:
         #print(extensions)
         #print(pst, to_pst)
 
-        self.array[to_pst[0][0]:to_pst[0][1], to_pst[1][0]:to_pst[1][1], to_pst[2][0]:to_pst[2][1]] += pokemino.poke_array[pst[0][0]:pst[0][1], pst[1][0]:pst[1][1], pst[2][0]:pst[2][1]]
+        try:
+            self.array[to_pst[0][0]:to_pst[0][1], to_pst[1][0]:to_pst[1][1], to_pst[2][0]:to_pst[2][1]] += pokemino.poke_array[pst[0][0]:pst[0][1], pst[1][0]:pst[1][1], pst[2][0]:pst[2][1]]
+        except ValueError:
+            print("Something went wrong this time!")
 
     @staticmethod
     def check_for_overlap(pokemino1, pokemino2):
