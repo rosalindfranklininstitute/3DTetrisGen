@@ -40,8 +40,8 @@ class Pokemino:
                  positioning,
                  algorithm,
                  brick_coords,
+                 brick_densities,
                  scale_factor,
-                 density,
                  max_ratio):
 
         """
@@ -57,16 +57,17 @@ class Pokemino:
         positioning (list)   :: Set of coordinates at which the Pokemino will be placed or "central" for fitting at volume centre
         algorithm            :: 'biased' when using Neville's biased generator or False when providing brick_coords
         brick_coords (list)  :: list of brick coordinates if not using biased algorithm
+        brick_densities (list): list of densities for user-defined coords
         scale_factor (int)   :: a scale factor for upscaling user-defined pokemino coords
-        density (int)        :: at the moment always == 1
         max_ratio (int)      ::
         """
 
         self.size = size
+        self.seed = seed
         self.volume = volume
         self.dim = dim # inherited from Pokemino2D or Pokemino3D
         self.cf = crowd_factor ** 2.5
-        self.density = density
+        self.brick_densities = brick_densities
         self.algorithm = algorithm
         self.scale_factor = scale_factor
 
@@ -121,14 +122,17 @@ class Pokemino:
 
         elif not self.algorithm:
             assert len(brick_coords) == self.size, "Size declared not matched with len(brick_pos_list)!"
+            #assert brick_densities is None or len(brick_densities) == self.size, "List of brick densities not compatible!"
             assert all([isinstance(i, list) for i in brick_coords]), "Brick positions passed in an incorrect format!"
             assert all([len(i) == self.dim for i in
                         brick_coords]), "Brick coordinates don't match the declared dimensionality!"
             self.bricks = list()
-            for brick_pos in brick_coords:
+            for x, brick_pos in enumerate(brick_coords):
+                density = 1 if self.brick_densities is None else brick_densities[x]
                 upscaled_coords = list(product(*[[coord * scale_factor + i for i in range(scale_factor)] for coord in brick_pos]))
-                for i in upscaled_coords:
-                    self.bricks.append(Brick(i))
+                for num, i in enumerate(upscaled_coords):
+                    self.bricks.append(Brick(i, density = density))
+                    #self.bricks.append(Brick(i, density= brick_densities[num]))
 
         self.make_coords_relative_to_centre_of_mass()
 
@@ -328,9 +332,9 @@ class Pokemino:
 class Pokemino2D(Pokemino):
 
     def __init__(self, size, volume, dim=2, seed=None, crowd_factor=0.5, target_ratio=None, positioning='central',
-                 algorithm="biased", brick_coords=None, scale_factor=1, density=1, max_ratio=None):
+                 algorithm="biased", brick_coords=None, brick_densities=None, scale_factor=1, max_ratio=None):
         super().__init__(size, volume, dim, seed, crowd_factor, target_ratio, positioning, algorithm, brick_coords,
-                         scale_factor, density, max_ratio)
+                         brick_densities, scale_factor, max_ratio)
         random.seed()
 
     def __repr__(self):
@@ -351,9 +355,9 @@ class Pokemino2D(Pokemino):
 class Pokemino3D(Pokemino):
 
     def __init__(self, size, volume, dim=3, seed=None, crowd_factor=0.5, target_ratio=None, positioning='central',
-                 algorithm="biased", brick_coords=None, scale_factor=1, density=1, max_ratio=None):
+                 algorithm="biased", brick_coords=None, brick_densities=None, scale_factor=1, max_ratio=None):
         super().__init__(size, volume, dim, seed, crowd_factor, target_ratio, positioning, algorithm, brick_coords,
-                         scale_factor, density, max_ratio)
+                         brick_densities, scale_factor, max_ratio)
         random.seed()
 
     def __repr__(self):
@@ -417,7 +421,6 @@ class Volume:
         """Fit pokemino.poke_array into volume (centred at pokemino.positioning)"""
 
         pos = tuple([a - b // 2 for a, b in zip(pokemino.positioning, pokemino.poke_array.shape)])
-        print(pos)
         self.paste(self.array, pokemino.poke_array, pos)
 
     @staticmethod
