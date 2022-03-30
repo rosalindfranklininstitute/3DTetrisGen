@@ -396,30 +396,29 @@ class Volume:
         self.n_creatures = 0
         self.creatures = np.empty(0, dtype=np.object)
 
+    @staticmethod
+    def paste(wall, block, loc):
+
+        def paste_slices(tup):
+            pos, w, max_w = tup
+            wall_min = max(pos, 0)
+            wall_max = min(pos + w, max_w)
+            block_min = -min(pos, 0)
+            block_max = max_w - max(pos + w, max_w)
+            block_max = block_max if block_max != 0 else None
+            return slice(wall_min, wall_max), slice(block_min, block_max)
+
+        loc_zip = zip(loc, block.shape, wall.shape)
+        wall_slices, block_slices = zip(*map(paste_slices, loc_zip))
+        wall[wall_slices] = block[block_slices]
+
     def fit_pokemino(self, pokemino):
 
         """Fit pokemino.poke_array into volume (centred at pokemino.positioning)"""
-        slices_boundaries = np.array([[i - a, i + b] for i, a, b in zip(pokemino.positioning,
-                                                                        np.floor(np.array(pokemino.poke_array.shape) / 2).astype(np.int32),
-                                                                        pokemino.poke_array.shape - np.floor(np.array(pokemino.poke_array.shape) / 2).astype(np.int32))])
 
-        extensions = np.array([(min(0, i), max(0, j-(self.shape[0]-1))) for i, j in slices_boundaries])
-
-        array_boundaries = np.array([[0, pokemino.poke_array.shape[i]] for i in range(3)])
-        array_boundaries[:,1] -= 1
-        slices_boundaries[:, 1] -= 1
-
-
-        pst = [(i, j) for [i, j] in array_boundaries-extensions]
-        to_pst = [(i, j) for [i, j] in slices_boundaries-extensions]
-
-        #print(extensions)
-        #print(pst, to_pst)
-
-        try:
-            self.array[to_pst[0][0]:to_pst[0][1], to_pst[1][0]:to_pst[1][1], to_pst[2][0]:to_pst[2][1]] += pokemino.poke_array[pst[0][0]:pst[0][1], pst[1][0]:pst[1][1], pst[2][0]:pst[2][1]]
-        except ValueError:
-            print("Something went wrong this time!")
+        pos = tuple([a - b // 2 for a, b in zip(pokemino.positioning, pokemino.poke_array.shape)])
+        print(pos)
+        self.paste(self.array, pokemino.poke_array, pos)
 
     @staticmethod
     def check_for_overlap(pokemino1, pokemino2):
