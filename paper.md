@@ -79,6 +79,6 @@ Figure sizes can be customized by adding an optional second parameter:
 
 # Acknowledgements
 
-We acknowledge contributions from...
+We acknowledge contributions from... . 
 
 # References
