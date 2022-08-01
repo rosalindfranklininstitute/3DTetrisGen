@@ -35,6 +35,7 @@ objects (polyominoes) for applications in computer vision.
 # Statement of need
 
 Statement of need will live here. 
+I am now testing creation of a PDF based on this paper.md file. 
 
 # Mathematics
 
