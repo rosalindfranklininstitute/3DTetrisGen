@@ -70,14 +70,12 @@ For a quick reference, the following citation commands can be used:
 
 # Figures
 
-Figures can be included like this:
-![Caption for example figure](figures/isomap3d.png){ width=20% }
+Figures can be included like this:![Caption for example figure.\label{fig:example}](/figures/isomap3d.png){ width=20% }
 and referenced from text using \autoref{fig:example}.
 
 Figure sizes can be customized by adding an optional second parameter:
 
-![Caption for example figure.]
-(figures/isomap3d.png){ width=20% }
+  ![Caption for example figure.](/figures/isomap3d.png)
 
 # Acknowledgements
 
