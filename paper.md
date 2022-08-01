@@ -30,7 +30,7 @@ aas-journal: Astrophysical Journal <- The name of the AAS journal.
 # Summary
 
 Pokemoinoes is a toy model for creation of 3D Volumes containing geometrical 
-objects for applications in computer vision. 
+objects (polyominoes) for applications in computer vision. 
 
 # Statement of need
 
