@@ -75,10 +75,11 @@ Figures can be included like this:
 and referenced from text using \autoref{fig:example}.
 
 Figure sizes can be customized by adding an optional second parameter:
+
 ![Caption for example figure.](figures/isomap3d.png){ width=20% }
 
 # Acknowledgements
 
-We acknowledge contributions from... . 
+We acknowledge contributions from...
 
 # References
