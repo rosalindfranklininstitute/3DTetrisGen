@@ -418,7 +418,7 @@ class Volume:
 
     def fit_pokemino(self, pokemino):
 
-        """Fit pokemino.poke_array into volume (centred at pokemino.positioning)"""
+        """Fit pokemino.poke_array into volume (centred at pokemino.positioning)  """
 
         pos = tuple([a - b // 2 for a, b in zip(pokemino.positioning, pokemino.poke_array.shape)])
         self.paste(self.array, pokemino.poke_array, pos)
