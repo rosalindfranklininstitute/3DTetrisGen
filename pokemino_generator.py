@@ -103,15 +103,16 @@ class Pokemino:
 
             if target_ratio is None:
                 self.target_ratio = np.array([1., 1., 1.], dtype=float)
-            self.target_ratio = np.array([self.target_ratio[1] / self.target_ratio[0],  # y/x
-                                          self.target_ratio[2] / self.target_ratio[1],  # z/y
-                                          self.target_ratio[2] / self.target_ratio[0],  # z/x
-                                          self.target_ratio[0] / self.target_ratio[1],  # x/y
-                                          self.target_ratio[1] / self.target_ratio[2],  # y/z
-                                          self.target_ratio[0] / self.target_ratio[2],  # x/z
-                                          ])
+            else: 
+                self.target_ratio = np.array([target_ratio[1] / target_ratio[0],  # y/x
+                                              target_ratio[2] / target_ratio[1],  # z/y
+                                              target_ratio[2] / target_ratio[0],  # z/x
+                                              target_ratio[0] / target_ratio[1],  # x/y
+                                              target_ratio[1] / target_ratio[2],  # y/z
+                                              target_ratio[0] / target_ratio[2],  # x/z
+                                             ])
 
-            for brick in tqdm(range(self.size)):
+            for brick in tqdm(range(self.size - 5)):
                 # Pick a brick then generate a random number
                 new_brick = random.choice(self.neighbours)
                 new_value = self._np_rng.random()
@@ -119,11 +120,19 @@ class Pokemino:
                     new_brick = random.choice(self.neighbours)
                     new_value = self._np_rng.random()
                 self._add_single_brick(new_brick.pos)
+            
+            all_bricks_for_now = [list(brick.pos) for brick in self.bricks]
+            self.bricks = []
+            # That's a new bit which tries to upscale biased Pokeminoes
+            for brick_pos in all_bricks_for_now:
+                upscaled_coords = list(product(*[[coord * scale_factor + i for i in range(scale_factor)] for coord in brick_pos]))
+                for num, i in enumerate(upscaled_coords):
+                    self.bricks.append(Brick(i))
 
         elif not self.algorithm:
             assert len(brick_coords) == self.size, "Size declared not matched with len(brick_pos_list)!"
             #assert brick_densities is None or len(brick_densities) == self.size, "List of brick densities not compatible!"
-            assert all([isinstance(i, list) for i in brick_coords]), "Brick positions passed in an incorrect format!"
+            assert all([isinstance(i, (list, tuple)) for i in brick_coords]), "Brick positions passed in an incorrect format!"
             assert all([len(i) == self.dim for i in
                         brick_coords]), "Brick coordinates don't match the declared dimensionality!"
             self.bricks = list()
@@ -132,7 +141,6 @@ class Pokemino:
                 upscaled_coords = list(product(*[[coord * scale_factor + i for i in range(scale_factor)] for coord in brick_pos]))
                 for num, i in enumerate(upscaled_coords):
                     self.bricks.append(Brick(i, density = density))
-                    #self.bricks.append(Brick(i, density= brick_densities[num]))
 
         self.make_coords_relative_to_centre_of_mass()
 
@@ -150,7 +158,7 @@ class Pokemino:
         else:
             self.positioning = np.array(positioning)
 
-        self.poke_array = np.zeros((2 * int(self.max_radius) + 1,) * self.dim)
+        self.poke_array = np.zeros((2 * int(self.max_radius) + 1,) * self.dim, dtype=np.float32)
 
         # TODO: deal with reading scaling_factor and upscaling a biased pokemino
         for brick in self.bricks:
@@ -418,7 +426,7 @@ class Volume:
 
     def fit_pokemino(self, pokemino):
 
-        """Fit pokemino.poke_array into volume (centred at pokemino.positioning)  """
+        """Fit pokemino.poke_array into volume (centred at pokemino.positioning)"""
 
         pos = tuple([a - b // 2 for a, b in zip(pokemino.positioning, pokemino.poke_array.shape)])
         self.paste(self.array, pokemino.poke_array, pos)
